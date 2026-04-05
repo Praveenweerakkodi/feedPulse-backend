@@ -9,6 +9,17 @@ import authRoutes from "./routes/auth.routes";
 // Load environment variables from .env
 dotenv.config();
 
+// Validate critical environment variables
+const criticalEnvVars = ["MONGODB_URI", "JWT_SECRET", "ADMIN_EMAIL", "ADMIN_PASSWORD"];
+const missingEnvVars = criticalEnvVars.filter(
+  (key) => !process.env[key],
+);
+if (missingEnvVars.length > 0) {
+  console.warn(
+    `⚠️  Warning: Missing critical environment variables: ${missingEnvVars.join(", ")}`,
+  );
+}
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
@@ -29,12 +40,14 @@ app.use(
 app.use(async (_req, _res, next) => {
   try {
     if (!isDBConnected()) {
+      console.log("⏳ Attempting to connect to MongoDB...");
       await connectDB();
     }
     next();
   } catch (error) {
-    console.error("Database connection failed:", error);
-    next(error);
+    console.error("⚠️  Database connection error:", error instanceof Error ? error.message : error);
+    // Don't fail the request - let routes handle it
+    next();
   }
 });
 
@@ -82,7 +95,9 @@ app.use(
     res: express.Response,
     _next: express.NextFunction,
   ) => {
-    console.error("Unhandled error:", err.message);
+    console.error("❌ Unhandled error:", err.message);
+    console.error("Stack:", err.stack);
+    
     res.status(500).json({
       success: false,
       error: "Internal server error",
@@ -97,14 +112,20 @@ app.use(
 //  Start Server
 const startServer = async () => {
   try {
+    console.log("🚀 Starting FeedPulse API...");
+    console.log(`📍 Environment: ${process.env.NODE_ENV || "development"}`);
+    console.log(`📧 Admin Email configured: ${!!process.env.ADMIN_EMAIL}`);
+    console.log(`🔑 JWT Secret configured: ${!!process.env.JWT_SECRET}`);
+    console.log(`🗄️  MongoDB URI configured: ${!!process.env.MONGODB_URI}`);
+    
     await connectDB();
     app.listen(PORT, () => {
-      console.log(`\n FeedPulse API running on http://localhost:${PORT}`);
-      console.log(` Health check: http://localhost:${PORT}/health`);
+      console.log(`\n✅ FeedPulse API running on http://localhost:${PORT}`);
+      console.log(`🏥 Health check: http://localhost:${PORT}/health`);
       console.log(` Environment: ${process.env.NODE_ENV || "development"}\n`);
     });
   } catch (error) {
-    console.error("Failed to start server:", error);
+    console.error("❌ Failed to start server:", error instanceof Error ? error.message : error);
     process.exit(1);
   }
 };
