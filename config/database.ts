@@ -9,8 +9,8 @@ export const connectDB = async (): Promise<void> => {
     throw new Error("MONGODB_URI is not defined in environment variables");
   }
 
-  // Return if already connected
-  if (mongoose.connection.readyState === 1) {
+  // Return if already connected (readyState === 1)
+  if ((mongoose.connection.readyState as number) === 1) {
     console.log("✅ MongoDB already connected");
     return;
   }
@@ -22,7 +22,7 @@ export const connectDB = async (): Promise<void> => {
     while (isConnecting) {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    if (mongoose.connection.readyState === 1) {
+    if ((mongoose.connection.readyState as number) === 1) {
       return;
     }
   }
@@ -57,12 +57,13 @@ export const connectDB = async (): Promise<void> => {
 };
 
 export const disconnectDB = async (): Promise<void> => {
-  if (mongoose.connection.readyState !== 0) {
+  // readyState 0 = disconnected, 3 = disconnecting
+  if ((mongoose.connection.readyState as number) !== 0) {
     await mongoose.connection.close();
     console.log("🔌 MongoDB connection closed");
   }
 };
 
 export const isDBConnected = (): boolean => {
-  return mongoose.connection.readyState === 1;
+  return (mongoose.connection.readyState as number) === 1;
 };
