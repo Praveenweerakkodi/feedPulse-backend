@@ -7,6 +7,15 @@ export const submitFeedback = async (req: Request, res: Response): Promise<void>
   try {
     const { title, description, category, submitterName, submitterEmail } = req.body;
 
+    if (!title || !description || !category) {
+      res.status(400).json({
+        success: false,
+        error: "Missing required fields",
+        message: "Title, description, and category are required.",
+      });
+      return;
+    }
+
     const submitterIp = req.ip || req.socket.remoteAddress || 'unknown';
 
     const feedback = await Feedback.create({
@@ -50,13 +59,12 @@ export const submitFeedback = async (req: Request, res: Response): Promise<void>
 
         console.log(`✅ AI analysis saved for feedback: ${feedback._id}`);
       } catch (aiError) {
-       
-        console.error(`⚠️  AI analysis failed for feedback ${feedback._id}:`, aiError);
-      
+        console.error(`⚠️  AI analysis failed for feedback ${feedback._id}:`, aiError instanceof Error ? aiError.message : aiError);
       }
     })();
 
   } catch (error) {
+    console.error('submitFeedback error:', error instanceof Error ? error.message : error);
 
     if (error instanceof Error && error.name === 'ValidationError') {
       res.status(400).json({
@@ -67,7 +75,6 @@ export const submitFeedback = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    console.error('submitFeedback error:', error);
     res.status(500).json({
       success: false,
       error: 'Server error',

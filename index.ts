@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
-import { connectDB } from "./config/database";
+import { connectDB, isDBConnected } from "./config/database";
 import feedbackRoutes from "./routes/feedback.routes";
 import authRoutes from "./routes/auth.routes";
 
@@ -18,12 +18,25 @@ app.use(helmet());
 // CORS Setup
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: process.env.FRONTEND_URL || "https://feedpulse-delta.vercel.app",
     credentials: true,
     methods: ["GET", "POST", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
+
+// Database Connection Middleware for Vercel Serverless
+app.use(async (_req, _res, next) => {
+  try {
+    if (!isDBConnected()) {
+      await connectDB();
+    }
+    next();
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    next(error);
+  }
+});
 
 // Body Parsing Middleware
 app.use(express.json({ limit: "10kb" }));
@@ -97,22 +110,8 @@ const startServer = async () => {
 };
 
 // Only start server if running locally, not as a Vercel serverless function
-if (process.env.NODE_ENV !== "test" && process.env.VERCEL !== "1") {
+if (process.env.NODE_ENV !== "test" && !process.env.VERCEL) {
   startServer().catch(console.error);
-} else if (process.env.NODE_ENV !== "test") {
-  // For Vercel, ensure DB connects on first request
-  app.use(async (_req, _res, next) => {
-    try {
-      if (!process.env.MONGODB_CONNECTED) {
-        await connectDB();
-        process.env.MONGODB_CONNECTED = "1";
-      }
-      next();
-    } catch (error) {
-      console.error("DB connection error:", error);
-      throw error;
-    }
-  });
 }
 
 export default app;

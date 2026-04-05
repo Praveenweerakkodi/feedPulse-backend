@@ -16,34 +16,45 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     const emailLower = email.toLowerCase().trim();
+    const passwordTrimmed = password.trim();
     let isValidAdmin = false;
     let adminEmail = emailLower;
+    let authMethod = "";
 
-    try {
-      const user = await User.findOne({ email: emailLower }).select(
-        "+password",
-      );
-      if (user) {
-        isValidAdmin = await user.comparePassword(password);
+    // First, try .env credentials (most reliable in serverless)
+    const envEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+    const envPassword = process.env.ADMIN_PASSWORD?.trim();
+
+    if (emailLower === envEmail && passwordTrimmed === envPassword) {
+      isValidAdmin = true;
+      adminEmail = emailLower;
+      authMethod = "env";
+      console.log("✅ Login successful via .env credentials");
+    } else {
+      // Fallback: try database
+      try {
+        const user = await User.findOne({ email: emailLower }).select(
+          "+password",
+        );
+        if (user) {
+          isValidAdmin = await user.comparePassword(passwordTrimmed);
+          if (isValidAdmin) {
+            authMethod = "database";
+            console.log("✅ Login successful via database");
+          }
+        }
+      } catch (dbError) {
+        console.warn(
+          "⚠️  DB user check failed:",
+          dbError instanceof Error ? dbError.message : dbError,
+        );
       }
-    } catch (dbError) {
+    }
+
+    if (!isValidAdmin) {
       console.warn(
-        "DB user check failed, falling back to .env credentials:",
-        dbError,
+        `❌ Failed login attempt for email: ${emailLower}. Auth method: ${authMethod || "none"}`,
       );
-    }
-
-    if (!isValidAdmin) {
-      const envEmail = process.env.ADMIN_EMAIL?.toLowerCase();
-      const envPassword = process.env.ADMIN_PASSWORD;
-
-      if (emailLower === envEmail && password === envPassword) {
-        isValidAdmin = true;
-        adminEmail = emailLower;
-      }
-    }
-
-    if (!isValidAdmin) {
       res.status(401).json({
         success: false,
         error: "Invalid credentials",
@@ -52,7 +63,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    //  Generate JWT token
+    // Generate JWT token
     const jwtSecret = process.env.JWT_SECRET;
     if (!jwtSecret) {
       throw new Error("JWT_SECRET is not configured");
@@ -74,7 +85,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Login error:", error instanceof Error ? error.message : error);
     res.status(500).json({
       success: false,
       error: "Server error",
