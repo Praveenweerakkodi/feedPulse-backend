@@ -29,6 +29,16 @@ app.use(
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Root Route
+app.get("/", (_req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "FeedPulse API is running",
+    version: "1.0.0",
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Health Check Route
 app.get("/health", (_req, res) => {
   res.status(200).json({
@@ -86,7 +96,23 @@ const startServer = async () => {
   }
 };
 
-if (process.env.NODE_ENV !== "test") {
-  startServer();
+// Only start server if running locally, not as a Vercel serverless function
+if (process.env.NODE_ENV !== "test" && process.env.VERCEL !== "1") {
+  startServer().catch(console.error);
+} else if (process.env.NODE_ENV !== "test") {
+  // For Vercel, ensure DB connects on first request
+  app.use(async (_req, _res, next) => {
+    try {
+      if (!process.env.MONGODB_CONNECTED) {
+        await connectDB();
+        process.env.MONGODB_CONNECTED = "1";
+      }
+      next();
+    } catch (error) {
+      console.error("DB connection error:", error);
+      throw error;
+    }
+  });
 }
+
 export default app;
