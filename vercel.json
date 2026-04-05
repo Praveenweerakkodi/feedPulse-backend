@@ -2,20 +2,10 @@
   "version": 2,
   "buildCommand": "npm run build",
   "public": false,
-  "functions": {
-    "index.ts": {
-      "runtime": "nodejs20.x",
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.ts"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
